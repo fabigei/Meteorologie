@@ -19,12 +19,15 @@ const double z_scale=8000;
 double calculatePotTemp(double temp, double pressure);
 void print_vec(vector<double> vec);
 double calcDeltaTempSolarSurfaceHeating(double deltaTime,double eSolarSurface,double deltaPressure);
+void calcDeltaTempVec(double deltaTime,vector<double> Edelta,double deltaPressure,vector<double> deltaTempVec);
 void radiativeTransfer(int nlayer,int nmu, vector<double> opt_thick_vec,double LSurface,vector<double> sb_vec,vector<double>& Edelta );
 double planck(double temp, double lambda_dn, double lambda_up );
 void planckVec(vector<double> tempVec, double lambda_dn, double lambda_up, vector <double> & bbVec);
 void getHeightfromPressure(vector<double> pressureVec, vector<double> heightVec);
 void calcOpticalThickFromHeight(double beta0,vector<double> he_vec,vector <double> &opt_thick_vec);
-void calcOpticalThickFromPressure(double beta0,vector<double> pressureVec,vector <double> &opt_thick_vec);
+void calcOpticalThickfromPressure( double beta0,double deltaPressure, vector<double> &opt_thick_vec);
+void calcOpticalThickfromPressure( double beta0,double deltaPressure, vector<double> &opt_thick_vec);
+
 int main(int argc, char** args){
 	
 	int nLayer,nMu;
@@ -68,14 +71,12 @@ int main(int argc, char** args){
 		//cout<<mid_pressure_vec[i]<<endl;
 	}
 	
-	getHeightfromPressure(mid_pressure_vec, height_vec);
+	getHeightfromPressure(mid_pressure_vec,height_vec);
 		
-	calcOpticalThickFromPressure(beta0,mid_pressure_vec,opt_thick_vec);
-	
+	calcOpticalThickfromPressure(beta0,deltaPressure,opt_thick_vec);
 
 
-
-	mid_temp_vec.end()+=calcDeltaTempSolarSurfaceHeating(deltaTime,eSolarSurface,deltaPressure);
+	//mid_temp_vec.end()+=calcDeltaTempSolarSurfaceHeating(deltaTime,eSolarSurface,deltaPressure);
 	
 
 	//The surface Temp needs to be adapted. (At least I think so...) Maybe its temp_vec[nlayer-1] ?
@@ -85,13 +86,10 @@ int main(int argc, char** args){
 	//Still have to create the temp_vec. 
 	//Probably a loop over the  lambda seqments.
 	planckVec(mid_temp_vec, 12, 100,plankRadiation_vec);
-	//planckVec(temp_vec, double lambda_dn, double lambda_up,plankRadiation_vec);
 	
 	radiativeTransfer(nLayer, nMu, opt_thick_vec,LSurface,plankRadiation_vec, Edelta );
   	
-	
-	
-	
+
 	
 	
 	
@@ -204,14 +202,13 @@ void planckVec(vector<double> tempVec, double lambda_dn, double lambda_up, vecto
 	}
 }
 
-void calcOpticalThickFromPressure(double beta0,vector<double> pressureVec,vector <double> &opt_thick_vec){
-	for(int i=1;i<opt_thick_vec.size();i++){
-			//opt_thick_vec[i]=beta0*pressure0/pow(pressureVec[i],2) *z_scale*(1+log(pressure0/pressureVec[i])) *(pressureVec[1]-pressureVec[0]);
-			opt_thick_vec[i]=   (-1)*beta0/pressure0 * z_scale * (pressureVec[1]-pressureVec[0]);
-			//opt_thick_vec[i]=beta0*z_scale/pressure0 *(pressureVec[i]*log(pressure0/pressureVec[i]) -pressureVec[i-1]*log(pressure0/pressureVec[i-1])); //(log(pressure0/pressureVec[i]))*(pressureVec[1]-pressureVec[0]);
+
+
+void calcOpticalThickfromPressure( double beta0,double deltaPressure, vector<double> &opt_thick_vec){
+	for(int i=0;i<opt_thick_vec.size();i++){
+	  opt_thick_vec[i]=beta0*z_scale/pressure0*deltaPressure;
 	}
 }
-
 
 void calcOpticalThickFromHeight(double beta0,vector<double> he_vec,vector <double> &opt_thick_vec){
 	//Skalenhoehe in m
@@ -219,4 +216,16 @@ void calcOpticalThickFromHeight(double beta0,vector<double> he_vec,vector <doubl
 	for(int i=0;i<opt_thick_vec.size();i++){
 	  opt_thick_vec[i]=beta0* exp(-(he_vec[i]/z_scale))*(he_vec[i]-he_vec[i+1]);
 	}
+}
+
+
+void calcDeltaTempVec(double deltaTime,vector<double> Edelta,double deltaPressure,vector<double> deltaTempVec){
+		
+	for(int i=0;i<Edelta.size();i++){
+
+		deltaTempVec[i]=deltaTime*Edelta[i]*gravitationalConst/deltaPressure/cpConst;
+
+
+	}
+
 }
