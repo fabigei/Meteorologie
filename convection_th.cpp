@@ -15,7 +15,7 @@ const double cpConst=1005;
 const double molarMassDryAir= 28.97; // g/mol
 const double zScale= 8000; // Scaleheight in m
 
-double calculatePotTemp(double temp, double pressure);
+void calcPotTempVec(vector<double> tempVec, vector<double> pressureVec, vector<double> potTempVec);
 void print_vec(vector<double> vec);
 double calcDeltaTempSolarSurfaceHeating(double deltaTime,double eSolarSurface,double deltaPressure);
 void rt(int nlayer,int nmu, vector<double> opt_thick_vec,double LSurface,vector<double> sb_vec,vector<double>& Edelta );
@@ -34,16 +34,21 @@ int main(int argc, char** args){
 	double eSolarSurface=e0/4 *(1-albedo);
 	double deltaTime=60; //in s
 	double deltaPressure;
+	double L_surface;
 
 	double beta0=0.001;
 	double lambda_dn=1;
 	double lambda_up=100;
 
-	vector<double> mid_pressure_vec;
+	vector<double> mid_pressure_vec;  /////Verschiedene Grids im Variablennamen kenntlich machen!!!!!!!
 	vector<double> temp_vec;
+	vector<double> mid_temp_vec;
+	vector<double> pot_temp_vec;
+	vector<double> mid_pot_temp_vec;
 	vector<double> height_vec;
 	vector<double> opt_thick_vec; 
 	vector<double> bb_vec;
+	vector<double> E_delta;
 
 	if (argc==1){ 
 		cout<<"Try again -- Enter the number of layers you want to use."<<endl; 
@@ -56,13 +61,17 @@ int main(int argc, char** args){
 	
 	
 	
-	mid_pressure_vec.resize(nLayer);
+	mid_pressure_vec.resize(nLayer-1);
 	temp_vec.resize(nLayer);
 	fill(temp_vec.begin(),temp_vec.end(),0);
+	mid_temp_vec.resize(nLayer-1);
+	pot_temp_vec.resize(nLayer);
+	mid_pot_temp_vec.resize(nLayer-1);
+
 	opt_thick_vec.resize(nLayer-1);
 	fill(opt_thick_vec.begin(),opt_thick_vec.end(),0);
-	bb_vec.resize(nLayer-1);
-
+	bb_vec.resize(nLayer);
+	E_delta.resize(nLayer);
 	
 	deltaPressure=pressure0/(nLayer-1);
 	for(int i=0;i<nLayer-1;i++){
@@ -70,29 +79,18 @@ int main(int argc, char** args){
 	}
 	
 
+
 	calcOpticalThickfromPressure(beta0,deltaPressure,opt_thick_vec);
 
-	print_vec(opt_thick_vec);
-	double sum=0;
-	for (int i=0;i<nLayer;i++){
-		sum+=opt_thick_vec[i];
+	calcPlanckVec(mid_temp_vec,lambda_dn,lambda_up,bb_vec);
 
-	}
-	//cout<< "Sum "<< sum<< endl;
+	L_surface=calcPlanck(288.15,lambda_dn,lambda_up)/M_PI; 
+
+	rt(nLayer, 100, opt_thick_vec, L_surface, bb_vec, E_delta );
+
+	//print_vec(E_delta);
 	
-	calcPlanckVec(temp_vec,lambda_dn,lambda_up,bb_vec);
-	//print_vec(bb_vec);
-
-	//////LSurface extra berechnen!!////
-	//Lsurface=planck(288.15,lambda_dn,lambda_up)/M_PI; 
-
-
-
-
-
-
-
-	temp_vec[nLayer-1]+=calcDeltaTempSolarSurfaceHeating(deltaTime,eSolarSurface,deltaPressure);
+	//temp_vec[nLayer-1]+=calcDeltaTempSolarSurfaceHeating(deltaTime,eSolarSurface,deltaPressure);
 	
 	
 	
@@ -120,11 +118,12 @@ void getHeightfromPressure(vector<double> pressureVec, vector<double> heightVec)
 */
 
 
-double calculatePotTemp(double temp, double pressure){
-
-	return temp*pow(pressure/pressure0,kappaConst);
-
+void calcPotTempVec(vector<double> tempVec, vector<double> pressureVec, vector<double> potTempVec){
+	for (int i=0;i<potTempVec.size();i++){
+		potTempVec[i]= tempVec[i]*pow(pressureVec[i]/pressure0,kappaConst);
+	}
 }
+
 
 
 double calcDeltaTempSolarSurfaceHeating(double deltaTime,double eSolarSurface,double deltaPressure){
@@ -155,7 +154,6 @@ void rt(int nlayer,int nmu, vector<double> opt_thick_vec,double LSurface,vector<
   Edn.resize(nlayer+1);
   Eup.resize(nlayer+1);
   Enet.resize(nlayer+1);
-  Edelta.resize(nlayer);
   if(Edn.size()!=nlayer+1){
 	  Edn.resize(nlayer+1);
 	  Eup.resize(nlayer+1);
