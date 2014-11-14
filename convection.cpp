@@ -13,6 +13,7 @@ const double gravitationalConst=9.81; //m/s^2
 const double kappaConst=2./7.; 
 const double cpConst=1005;
 const double molarMassDryAir= 28.97; // g/mol
+const double zScale= 8000; // Scaleheight in m
 
 double calculatePotTemp(double temp, double pressure);
 void print_vec(vector<double> vec);
@@ -20,6 +21,7 @@ double calcDeltaTempSolarSurfaceHeating(double deltaTime,double eSolarSurface,do
 void rt(int nlayer,int nmu, vector<double> opt_thick_vec,double LSurface,vector<double> sb_vec,vector<double>& Edelta );
 double planck(double temp, double lambda_dn, double lambda_up );
 void getHeightfromPressure(vector<double> pressureVec, vector<double> heightVec);
+void calcOpticalThickfromPressure(double nlayer, double beta0,double deltaPressure, vector<double> &opt_thick_vec);
 
 
 int main(int argc, char** args){
@@ -32,9 +34,11 @@ int main(int argc, char** args){
 	vector<double> mid_pressure_vec;
 	vector<double> temp_vec;
 	vector<double> height_vec;
-	//vector<double> 
+	vector<double> opt_thick_vec; 
 	double deltaPressure;
-	
+	double beta0=0.001;
+
+
 	if (argc==1){ 
 		cout<<"Try again -- Enter the number of layers you want to use."<<endl; 
 		return 0;
@@ -57,11 +61,15 @@ int main(int argc, char** args){
 	}
 	
 
-	getHeightfromPressure(mid_pressure_vec, height_vec);
-	
-	//print_vec(mid_pressure_vec);
-	//cout<<temp_vec[nLayer-1]<<endl;
-	
+	calcOpticalThickfromPressure(nLayer,beta0,deltaPressure, opt_thick_vec);
+
+	print_vec(opt_thick_vec);
+	double sum=0;
+	for (int i=0;i<nLayer;i++){
+		sum+=opt_thick_vec[i];
+
+	}
+	cout<< "Sum"<< sum<< endl;
 	
 	//////LSurface berechnen!!////
 	//Lsurface=planck(288.15,lambda_dn,lambda_up)/M_PI; 
@@ -80,18 +88,20 @@ int main(int argc, char** args){
 	return 0;
 }
 
-
+/* Noch nicht ganz richtig....Probleme mit der Hoehe
 void getHeightfromPressure(vector<double> pressureVec, vector<double> heightVec){
 	heightVec.resize(pressureVec.size());
 	for(int i=0;i<pressureVec.size();i++){
 		heightVec[i]= -8000*log(pressureVec[i]/100000);  // 100.000 Pa Surface pressure
 		
 	if (heightVec[i]<1e-10) heightVec[i]=0;
-	//cout<<heightVec[i]<<"           "<< pressureVec[i]<<endl;
+	cout<<heightVec[i]<<"           "<< pressureVec[i]<<endl;
 	}
 
 
 }
+*/
+
 
 double calculatePotTemp(double temp, double pressure){
 
@@ -107,19 +117,16 @@ double calcDeltaTempSolarSurfaceHeating(double deltaTime,double eSolarSurface,do
 }
 
 
-
-
-
 void print_vec(vector<double> vec){
   for(int i=0;i<vec.size();i++){
     cout<<vec[i]<<endl;
   }
 }
-void calcOpticalThick(double beta0,vector<double> he_vec,vector <double> &opt_thick_vec){
-	double z_scale=8000; //Skalenhoehe in m
-	//opt_thick_vec.resize(nlayer);
+
+void calcOpticalThickfromPressure(double nlayer, double beta0,double deltaPressure, vector<double> &opt_thick_vec){
+	opt_thick_vec.resize(nlayer);
 	for(int i=0;i<opt_thick_vec.size();i++){
-	  opt_thick_vec[i]=beta0* exp(-(he_vec[i]+he_vec[i+1])/2/z_scale)*(he_vec[i]-he_vec[i+1]);
+	  opt_thick_vec[i]=beta0*zScale/pressure0*deltaPressure;
 	}
 }
 
