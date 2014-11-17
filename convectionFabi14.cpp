@@ -7,7 +7,7 @@
  	
 
 
-//#include "./gnuplot_i-2.10/src/gnuplot_i.h"
+#include "./gnuplot_i-2.10/src/gnuplot_i.h"
 
 
 using namespace std;
@@ -50,7 +50,9 @@ void vectorAdd(vector<T> inputVecA,vector<T> inputVecB, vector<T> & outputVec){
 	}
 }
 
-
+	double e0=1362; // W/m^2
+	double albedo=0.3;
+	double eSolarSurface=e0/4 *(1-albedo);
 
 
 
@@ -58,19 +60,17 @@ int main(int argc, char** args){
 	
 
 
-	 //gnuplot_ctrl *g1;
+	 gnuplot_ctrl *g1;
 
-	 //g1 = gnuplot_init();
+	 g1 = gnuplot_init();
 
 
 
 	int nLayer,nMu;
-	double e0=1362; // W/m^2
-	double albedo=0.3;
-	double eSolarSurface=e0/4 *(1-albedo);
-	double deltaTime=8640; //in s
+
+	double deltaTime=600; //in s
 	double timeStep;
-	double MaxTime=8640*2;//3.15569e7; //3.15569e7=1a in seconds
+	double MaxTime=3.15569e7; //3.15569e7=1a in seconds
 	double beta0=0.0019;
 	vector<double> mid_pressure_vec;
 	
@@ -102,7 +102,7 @@ int main(int argc, char** args){
 	plankRadiation_vec.resize(nLayer);
 	mid_height_vec.resize(nLayer);
 
-	fill(mid_temp_vec.begin(),mid_temp_vec.end(),100);
+	fill(mid_temp_vec.begin(),mid_temp_vec.end(),10.);
 	
 	
 	deltaPressure=pressure0/(nLayer-1);
@@ -118,92 +118,90 @@ int main(int argc, char** args){
 	//mid_temp_vec.end()+=calcDeltaTempSolarSurfaceHeating(deltaTime,eSolarSurface,deltaPressure);
 	for(int timeStep=0;timeStep<=MaxTime;timeStep+=deltaTime){
 
-	//The surface Temp needs to be adapted. (At least I think so...) Maybe its temp_vec[nlayer] ?
-	LSurface=planck(mid_temp_vec[nLayer-1],4,100)/M_PI;
+		//The surface Temp needs to be adapted. (At least I think so...) Maybe its temp_vec[nlayer] ?
+		LSurface=planck(mid_temp_vec[nLayer-1],4,100)/M_PI;
+			
+
+		//Still have to create the temp_vec. 
+		//Probably a loop over the  lambda seqments.
+		planckVec(mid_temp_vec, 4 , 100,plankRadiation_vec);
+		
+		radiativeTransfer(nLayer, nMu, opt_thick_vec,LSurface,plankRadiation_vec, Edelt_vec);
+
+
+		//Edelt_vec[nLayer-1]+=eSolarSurface;
+
+		//print_vec(Edelt_vec);
+
 		
 
-	//Still have to create the temp_vec. 
-	//Probably a loop over the  lambda seqments.
-	planckVec(mid_temp_vec, 4 , 100,plankRadiation_vec);
-	
-	radiativeTransfer(nLayer, nMu, opt_thick_vec,LSurface,plankRadiation_vec, Edelt_vec);
-
-
-	Edelt_vec[nLayer-1]+=eSolarSurface;
-
-	print_vec(Edelt_vec);
-
-	
-
-	calcDeltaTempVec(deltaTime,Edelt_vec,deltaPressure,middleDeltaTemp_vec);
-	
-	//TODO: *size(Edelt_vec),size(deltaTem_vec),size(mTemp_vec) must fit together
-	//calcMiddleVec(deltaTemp_vec,MiddleDeltaTemp_vec);
-
-
-
-	vectorAdd(middleDeltaTemp_vec,mid_temp_vec,mid_temp_vec);
-
-	cout<<endl;
-
-	print_vec(mid_temp_vec);
-
-	getPotTempVecFromTempVec(mid_temp_vec, mid_pressure_vec,mid_pot_temp_vec);
-
-
-	sort(mid_pot_temp_vec.begin(), mid_pot_temp_vec.end(), greater<double>());
-
-
-	getTempVecFromPotTempVec(mid_pot_temp_vec,mid_pressure_vec,mid_temp_vec);
-	
- 	cout<<endl<<endl<<endl;
-	/*if (int(timeStep/deltaTime)%10 == 0) {
-      
-		getHeightfromPressure(mid_pressure_vec,mid_temp_vec,mid_height_vec);
-
-      gnuplot_resetplot  (g1);  start with new plot rather than plotting into exisiting one 
-      gnuplot_setstyle   (g1, "linespoints");      // draw lines and points 
-      gnuplot_set_xlabel (g1, "temperature [K]");   //xaxis label 
-      gnuplot_set_ylabel (g1, "pressure Pa");    // yaxis label 
-      
-     
-    	
-    	
+		calcDeltaTempVec(deltaTime,Edelt_vec,deltaPressure,middleDeltaTemp_vec);
 		
+		//middleDeltaTemp_vec[nLayer-1]+=eSolarSurface * gravitationalConst/deltaPressure/cpConst;
+		//cout<<"ssssss"<<endl;
+		//print_vec(middleDeltaTemp_vec);
+		//deltaT[nlyr-1] += (E_s + Edn_tot[nlyr] - Eup_tot[nlyr]) * g / deltap / c_p;  
+		//TODO: *size(Edelt_vec),size(deltaTem_vec),size(mTemp_vec) must fit together
+		//calcMiddleVec(deltaTemp_vec,MiddleDeltaTemp_vec);
 
-    	double *mid_temp_array=&mid_temp_vec[0];
-    	double *mid_pot_temp_array=&mid_pot_temp_vec[0];
+		
+		vectorAdd(middleDeltaTemp_vec,mid_temp_vec,mid_temp_vec);
 
-    	double *mid_height_array=&mid_height_vec[0];
-    	double *mid_pressure_array=&mid_pressure_vec[0];
-     	gnuplot_plot_xy(g1,mid_temp_array, mid_height_array, nLayer, "Temperature");
-     	sleep(1); wait a second 
-    }
- 	 
+		//print_vec(middleDeltaTemp_vec);
+		//cout<<endl;
+		
+		getPotTempVecFromTempVec(mid_temp_vec, mid_pressure_vec,mid_pot_temp_vec);
 
 
+		sort(mid_pot_temp_vec.begin(), mid_pot_temp_vec.end(), greater<double>());
+
+
+		getTempVecFromPotTempVec(mid_pot_temp_vec,mid_pressure_vec,mid_temp_vec);
+	 	//cout<<endl<<endl<<endl;
+
+	 	//live ploting
+		if (int(timeStep/deltaTime)%10 == 0) {
+	      
+			getHeightfromPressure(mid_pressure_vec,mid_temp_vec,mid_height_vec);
+
+	      gnuplot_resetplot  (g1);  //start with new plot rather than plotting into exisiting one 
+	      gnuplot_setstyle   (g1, "linespoints");      // draw lines and points 
+	      gnuplot_set_xlabel (g1, "temperature [K]");   //xaxis label 
+	      gnuplot_set_ylabel (g1, "height [m]");    // yaxis label 
+	      
+	     
+	    	
+	    	
+			
+
+	    	double *mid_temp_array=&mid_temp_vec[0];
+	    	double *mid_pot_temp_array=&mid_pot_temp_vec[0];
+
+	    	double *mid_height_array=&mid_height_vec[0];
+	    	double *mid_pressure_array=&mid_pressure_vec[0];
+	     	gnuplot_plot_xy(g1,mid_temp_array, mid_height_array, nLayer, "Temperature");
+	     	//sleep(1); // wait a second 
+	    }
+	 	 
 
 
 
 
+
+    } 
 
 	
 	gnuplot_close (g1) ; 	
-	 */
+	 
 	
-} 
+
 	//print_vec(mid_pot_temp_vec);
 	//print_vec(mid_temp_vec);
 
 	//print_vec(mid_temp_vec);
-
-	
-
-	//TODO:	*loop over time steps
-	
 	
 	 
-	
+	//TODO: 3Band and Optical Thickness
 	
 	
 	return 0;
@@ -214,9 +212,9 @@ void getHeightfromPressure(vector<double> mid_pressure_vec,vector<double> mid_te
 	
 	double deltaPressure=mid_pressure_vec[3]-mid_pressure_vec[2];
 	heightVec.resize(mid_pressure_vec.size());
-	heightVec[0]=0;
-	for(int i=1;i<mid_pressure_vec.size();i++){
-		heightVec[i]= heightVec[i-1] +deltaPressure* 287.0*mid_temp_vec[i]/mid_pressure_vec[i] /gravitationalConst; // 100.000 Pa Surface pressure
+	heightVec[mid_pressure_vec.size()-1]=0;
+	for(int i=mid_pressure_vec.size()-2;i>=0;i--){
+		heightVec[i]= heightVec[i+1] +deltaPressure* 287.0*mid_temp_vec[i]/mid_pressure_vec[i] /gravitationalConst; // 100.000 Pa Surface pressure
 		
 	//if (heightVec[i]<1e-10) heightVec[i]=0;
 	//cout<<i<<"   "<<heightVec[i]<<"           "<< pressureVec[i]<<endl;
@@ -307,14 +305,19 @@ void radiativeTransfer(int nlayer,int nmu, vector<double> opt_thick_vec,double L
     
     }
 
-
+    cout<<"Edn"<<endl;
+    print_vec(Edn);
+    cout<<"Eup"<<endl;
+    print_vec(Eup);
     for (int i=0;i<nlayer+1;i++){
       Enet[i]= Edn[i]-Eup[i];
 	}
 	
 	for (int i=0;i<nlayer;i++){
 		Edelta[i]= Enet[i]-Enet[i+1];
+		//cout<<i<<"  "<<Edelta[i]<<endl;
 	}
+	Edelta[nlayer-1]=Edelta[nlayer-1]+Edn[nlayer]-Eup[nlayer]+eSolarSurface;
 	
 }
 
