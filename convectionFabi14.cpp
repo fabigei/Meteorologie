@@ -16,7 +16,7 @@ using namespace std;
 const double pressure0=100000; //in Pa
 const double gasConst=8.3144621; //J/(K*mol)
 const double gravitationalConst=9.81; //m/s^2
-const double kappaConst=7/2.; 
+const double kappaConst=2/7.; 
 const double spezGasConstAir=287.; //in J/(kg*K)
 const double cpConst=1005;
 const double molarMassDryAir= 28.97; // g/mol
@@ -38,6 +38,12 @@ void calcMiddleVec(std::vector<double> inputVec,std::vector<double> & outputVec)
 void getPotTempVecFromTempVec(vector<double> TempVec,vector<double> pressureVec,vector<double>&PotTempVec);
 void getTempVecFromPotTempVec(vector<double>PotTempVec,vector<double> pressureVec,vector<double> & TempVec);
 
+void getOpticalThickfromPressure( double tau,int nLayer, vector<double> &opt_thick_vec);
+
+
+
+
+
 template <typename T>
 void vectorAdd(vector<T> inputVecA,vector<T> inputVecB, vector<T> & outputVec){
 	if(inputVecA.size()!=inputVecB.size()) {
@@ -55,16 +61,16 @@ void vectorAdd(vector<T> inputVecA,vector<T> inputVecB, vector<T> & outputVec){
 	double albedo=0.3;
 	double eSolarSurface=e0/4 *(1-albedo);
 
+	gnuplot_ctrl *g1;
 
 
 int main(int argc, char** args){
 	
-	//bool do_plots=true;
+	bool do_plots=true;
+
 
 	//if(do_plots==true){
-	 gnuplot_ctrl *g1;
-
-	 g1 = gnuplot_init();
+		 g1 = gnuplot_init();
 	//}
 
 
@@ -84,6 +90,7 @@ int main(int argc, char** args){
 	vector<double> middleDeltaTemp_vec;
 	vector<double> mid_pot_temp_vec;
 	
+	double tau;
 	double deltaPressure;
 	double LSurface; 
 	if (argc!=3){ 
@@ -104,10 +111,10 @@ int main(int argc, char** args){
 	planckRadiation_vec.resize(nLayer);
 	mid_height_vec.resize(nLayer);
 
-	fill(mid_temp_vec.begin(),mid_temp_vec.end(),10.);
+	fill(mid_temp_vec.begin(),mid_temp_vec.end(),280.);
 	
 
-	deltaPressure=pressure0/(nLayer-1);
+	deltaPressure=pressure0/(nLayer); //(nLayer-1)
 	for(int i=0;i<mid_pressure_vec.size();i++){
 		mid_pressure_vec[i]=i*deltaPressure +deltaPressure/2.;
 		//cout<<mid_pressure_vec[i]<<endl;
@@ -136,23 +143,32 @@ int main(int argc, char** args){
 
 		fill(Edelt_vec_3Bands.begin(),Edelt_vec_3Bands.end(),0.);
 		for (int i=0;i<bands_vec.size()-1;i++){
+			
 
+			if (i==0) {
+				beta0= 0.0019;
+				tau=10.;
+			}
+			if (i==1){
+				beta0= 5e-5;
+				tau=0.5;
+			}
+			if (i==2) {
+				beta0= 6.8e-4;
+				tau=1.;
+			}
 
-			if (i==0) beta0= 0.0019;
-			if (i==1) beta0= 5e-6;
-			if (i==2) beta0= 6e-5;
-
-			cout << i <<"  "<< beta0 << endl;
-			cout << "band lower "<< bands_vec[i]<<" band upper" << bands_vec[i+1]-1<< endl;
+			//cout << i <<"  "<< beta0 << endl;
+			//cout << "band lower "<< bands_vec[i]<<" band upper" << bands_vec[i+1]-1<< endl;
 	
-			calcOpticalThickfromPressure(beta0,deltaPressure,opt_thick_vec);
-
-			LSurface=planck(mid_temp_vec[nLayer-1],bands_vec[1],bands_vec[3]-1)/M_PI;
+			//calcOpticalThickfromPressure(beta0,deltaPressure,opt_thick_vec);
+			getOpticalThickfromPressure(  tau, nLayer, opt_thick_vec);
+			LSurface=planck(mid_temp_vec[nLayer-1],bands_vec[i],bands_vec[i+1]-1)/M_PI;
 			
 
 			//Still have to create the temp_vec. 
 			//Probably a loop over the  lambda seqments.
-			planckVec(mid_temp_vec, bands_vec[1] , bands_vec[3]-1,planckRadiation_vec);
+			planckVec(mid_temp_vec, bands_vec[i] , bands_vec[i+1]-1,planckRadiation_vec);
 	
 			radiativeTransfer(nLayer, nMu, opt_thick_vec,LSurface,planckRadiation_vec, Edelt_vec);
 			
@@ -162,7 +178,7 @@ int main(int argc, char** args){
 			
 
 		}
-
+		Edelt_vec_3Bands[nLayer-1]= Edelt_vec_3Bands[nLayer-1]+eSolarSurface;
 
 			
 			//print_vec(Edelt_vec);
@@ -180,6 +196,10 @@ int main(int argc, char** args){
 
 		
 			vectorAdd(middleDeltaTemp_vec,mid_temp_vec,mid_temp_vec);
+			//for (int i=0; i<nLayer; i++){
+			//	mid_temp_vec[i]=mid_temp_vec[i]+middleDeltaTemp_vec[i];
+			//}
+
 
 			//print_vec(middleDeltaTemp_vec);
 			//cout<<endl;
@@ -187,37 +207,46 @@ int main(int argc, char** args){
 			getPotTempVecFromTempVec(mid_temp_vec, mid_pressure_vec,mid_pot_temp_vec);
 
 
+			
 			sort(mid_pot_temp_vec.begin(), mid_pot_temp_vec.end(), greater<double>());
 
 
 			getTempVecFromPotTempVec(mid_pot_temp_vec,mid_pressure_vec,mid_temp_vec);
-	 		//cout<<endl<<endl<<endl;
+	 		
+	 		
 
-	 		//live ploting
-	 	//if (do_plots== true){
-			if (int(timeStep/deltaTime)%10 == 0) {
-	      
-				getHeightfromPressure(mid_pressure_vec,mid_temp_vec,mid_height_vec);
 
-	      		gnuplot_resetplot  (g1);  //start with new plot rather than plotting into exisiting one 
-	     		gnuplot_setstyle   (g1, "linespoints");      // draw lines and points 
-	      		gnuplot_set_xlabel (g1, "temperature [K]");   //xaxis label 
-	      		gnuplot_set_ylabel (g1, "height [m]");    // yaxis label 
-	      
-	     
-	    	
-	    	
 			
 
-	    		double *mid_temp_array=&mid_temp_vec[0];
-	    		double *mid_pot_temp_array=&mid_pot_temp_vec[0];
+	 		//live ploting
+	 		if (do_plots== true){
+				if (int(timeStep/deltaTime)%10 == 0) {
+		      
+					getHeightfromPressure(mid_pressure_vec,mid_temp_vec,mid_height_vec);
 
-	    		double *mid_height_array=&mid_height_vec[0];
-	    		double *mid_pressure_array=&mid_pressure_vec[0];
-	     		gnuplot_plot_xy(g1,mid_temp_array, mid_height_array, nLayer, "Temperature");
-	     		//sleep(1); // wait a second 
-	    	}
-	 	// } 
+		      		gnuplot_resetplot  (g1);  //start with new plot rather than plotting into exisiting one 
+		     		gnuplot_setstyle   (g1, "linespoints");      // draw lines and points 
+		      		gnuplot_set_xlabel (g1, "temperature [K]");   //xaxis label 
+		      		gnuplot_set_ylabel (g1, "height [m]");    // yaxis label 
+		      
+		     
+		    	
+		    	
+				
+
+		    		double *mid_temp_array=&mid_temp_vec[0];
+		    		double *mid_pot_temp_array=&mid_pot_temp_vec[0];
+
+		    		double *mid_height_array=&mid_height_vec[0];
+		    		double *mid_pressure_array=&mid_pressure_vec[0];
+		     		gnuplot_plot_xy(g1,mid_temp_array, mid_height_array, nLayer, "Temperature");
+		     		//sleep(1); // wait a second 
+		    		double *Edelt_array_3Bands=&Edelt_vec_3Bands[0];
+		    
+		     		//gnuplot_plot_xy(g1,Edelt_array_3Bands,mid_height_array,nLayer,"Edelta");
+	    			}
+
+	 		} 
 
 	
 
@@ -335,6 +364,13 @@ void radiativeTransfer(int nlayer,int nmu, vector<double> opt_thick_vec,double L
     
     }
 
+
+	
+
+			
+	 
+		
+//gnuplot_close (g1) ; 
     //cout<<"Edn"<<endl;
     //print_vec(Edn);
     //cout<<"Eup"<<endl;
@@ -347,8 +383,12 @@ void radiativeTransfer(int nlayer,int nmu, vector<double> opt_thick_vec,double L
 		Edelta[i]= Enet[i]-Enet[i+1];
 	//cout<<i<<"  "<<Edelta[i]<<endl;
 	}
-	Edelta[nlayer-1]=Edelta[nlayer-1]+Edn[nlayer]-Eup[nlayer]+eSolarSurface;
+	Edelta[nlayer-1]=Edelta[nlayer-1]+Edn[nlayer]-Eup[nlayer];
 	
+
+	
+	
+
 }
 
 double planck(double temp, double lambda_dn, double lambda_up ){
@@ -406,3 +446,9 @@ void calcMiddleVec(std::vector<double> inputVec,std::vector<double> & outputVec)
 	}
 }
 
+
+void getOpticalThickfromPressure( double tau,int nLayer, vector<double> &opt_thick_vec){
+	for(int i=0;i<opt_thick_vec.size();i++){
+	  opt_thick_vec[i]=tau/nLayer;
+	}
+}
