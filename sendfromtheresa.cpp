@@ -1,3 +1,8 @@
+
+
+
+try.cpp
+
 #include <iostream>
 #include <math.h>
 #include <vector>
@@ -18,8 +23,6 @@ int main(int argc, char** args){
 	
 	int Nlayer; //Number of  layers 
 	int Nmu;
-	double lambda_array[]={4,8,12,101};
-	double beta0_array[]={0.001,0.001,0.001};//{0.001, 5e-6, 6.8e-5}; 
 	double lambda_dn;
 	double lambda_up;
 	double beta0;
@@ -31,9 +34,6 @@ int main(int argc, char** args){
 	vector<double> opt_thick_vec;
 	vector<double> Edn;
 	vector<double> Eup;
-	vector<double> lambda_vec; //,lambdaUp_vec;
-	vector<double> beta0_vec;
-	
 	
 		//Reading in the number of layers, as an additional argument
 	if (argc==1){ 
@@ -45,12 +45,7 @@ int main(int argc, char** args){
 		Nmu= atoi(args[2]);
 		}
 		
-		
-	lambda_vec.assign(lambda_array,lambda_array+4);
-	beta0_vec.assign(beta0_array,beta0_array+3);
-	//lambda_vec.append(4);
-	//lambda_vec.append(8);
-	//lambda_vec.append(
+	
 	init_sys(Nlayer,he_vec,te_vec,mt_vec,sb_vec);
     
     
@@ -62,47 +57,20 @@ int main(int argc, char** args){
 	//}
 	
 	
-	// Verschiedene Bänder berechnen + verschiedene Optical Thickness verwenden
-	
-	
+	// Verschiedene BÃ€nder berechnen + verschiedene Optical Thickness verwenden
 	lambda_dn=12;   //4, 8, 12 einsetzen
 	lambda_up=100;  //7,11,100 einsetzen
-	beta0=6.8e-5;	// 0.001, 5e-6, 6.8e-5  !!!!nochmal nachprüfen!!!!
+	beta0=6.8e-5;	// 0.001, 5e-6, 6.8e-5  !!!!nochmal nachprÃŒfen!!!!
 	
-	for(int lambdaBand=0;lambdaBand<lambda_vec.size()-1;lambdaBand++){
-		
-		
-		if(lambdaBand!=lambda_vec.size()-2){
-			for (int i=0;i<Nlayer;i++){
-				bb_vec.resize(Nlayer);
-				bb_vec[i]=planck(mt_vec[i],lambda_vec[lambdaBand],lambda_vec[lambdaBand+1]-1)/M_PI;
-			}
-				//print_vec(sb_vec);
-				//cout<<"sssssss"<<endl;
-				//print_vec(bb_vec);
-			rt(Nlayer, Nmu, beta0_vec[lambdaBand], lambda_vec[lambdaBand], lambda_vec[lambdaBand+1]-1,he_vec, te_vec,  opt_thick_vec, bb_vec, Edn, Eup );
+	for (int i=0;i<Nlayer;i++){
+		bb_vec.resize(Nlayer);
+		bb_vec[i]=planck(mt_vec[i],lambda_dn,lambda_up)/M_PI;
 		}
-		 if(lambdaBand==lambda_vec.size()-2){
-			static vector<double> Eup_fix,Edn_fix;
-			Eup_fix=Eup;
-			Edn_fix=Edn;
-			//print_vec(Eup);
-			 for(;beta0_vec[2]<1e-3;beta0_vec[2]*=1.2){
-				//cout<<endl;
-				//cout<<beta0_vec[2]<<endl;
-				Eup=Eup_fix;
-				Edn=Edn_fix;
-				for (int i=0;i<Nlayer;i++){
-					bb_vec.resize(Nlayer);
-					bb_vec[i]=planck(mt_vec[i],lambda_vec[lambdaBand],lambda_vec[lambdaBand+1]-1)/M_PI;
-				}
-				rt(Nlayer, Nmu, beta0_vec[lambdaBand], lambda_vec[lambdaBand], lambda_vec[lambdaBand+1]-1,he_vec, te_vec,  opt_thick_vec, bb_vec, Edn, Eup );
-				
-			}
-		}
-	}
+		//print_vec(sb_vec);
+		//cout<<"sssssss"<<endl;
+		//print_vec(bb_vec);
+	rt(Nlayer, Nmu, beta0, lambda_dn, lambda_up,he_vec, te_vec,  opt_thick_vec, bb_vec, Edn, Eup );
 }
-	
 
 void init_sys(int nlayer, vector<double> & h_vec, vector <double> & t_vec,vector <double> & mt_vec,vector<double> & sb_vec){
 	
@@ -197,39 +165,36 @@ void rt(int nlayer,int nmu, double beta0, double lambda_dn, double lambda_up, ve
 
    vector<double>L;
   L.resize(nlayer+1);
-  if(Edn.size()!=nlayer+1){
-	  Edn.resize(nlayer+1);
-	  Eup.resize(nlayer+1);
-	  fill(Edn.begin(),Edn.end(),0);
-	  fill(Eup.begin(),Eup.end(),0);
-	}
+  Edn.resize(nlayer+1);
+  Eup.resize(nlayer+1);
+  fill(Edn.begin(),Edn.end(),0);
+  fill(Eup.begin(),Eup.end(),0);
+  
  
 
-    for(double mu=1./nmu/2;mu<=1;mu+=1./nmu){
+      for(double mu=1./nmu/2;mu<=1;mu+=1./nmu){
     
-		L[0]=0;
-		for(int i=0;i<nlayer;i++){
-		  L[i+1]=L[i]*exp(-opt_thick_vec[i]/mu)+sb_vec[i]*(1-exp(-opt_thick_vec[i]/mu));
-		  Edn[i+1]=Edn[i+1]+L[i+1]*2*M_PI*mu*1./nmu;
-		}
-		fill(L.begin(),L.end(),sqrt(-1));
-		L[nlayer]= planck(288.15,lambda_dn,lambda_up)/M_PI;        //sigma*pow(288.15,4)/M_PI;
-	    
-		Eup[nlayer]=Eup[nlayer]+L[nlayer]*2*M_PI*mu*1./nmu;
-	  
-		for(int i=nlayer;i>0;i--){
-		  L[i-1]=L[i]*exp(-opt_thick_vec[i-1]/mu)+sb_vec[i-1]*(1-exp(-opt_thick_vec[i-1]/mu));
-		  Eup[i-1]=Eup[i-1]+L[i-1]*2*M_PI*mu*1./nmu;
-		}
-	    
-    }
+	L[0]=0;
+	for(int i=0;i<nlayer;i++){
+	  L[i+1]=L[i]*exp(-opt_thick_vec[i]/mu)+sb_vec[i]*(1-exp(-opt_thick_vec[i]/mu));
+	  Edn[i+1]=Edn[i+1]+L[i+1]*2*M_PI*mu*1./nmu;
+	}
+	fill(L.begin(),L.end(),sqrt(-1));
+	L[nlayer]= planck(288.15,lambda_dn,lambda_up)/M_PI;        //sigma*pow(288.15,4)/M_PI;
+    
+	Eup[nlayer]=Eup[nlayer]+L[nlayer]*2*M_PI*mu*1./nmu;
+  
+	for(int i=nlayer;i>0;i--){
+	  L[i-1]=L[i]*exp(-opt_thick_vec[i-1]/mu)+sb_vec[i-1]*(1-exp(-opt_thick_vec[i-1]/mu));
+	  Eup[i-1]=Eup[i-1]+L[i-1]*2*M_PI*mu*1./nmu;
+	}
+    
+      }
 
-  //cout<<"Edn(TOA) " << Edn[0] <<"    Eup(TOA) "<< Eup[0] <<endl;
-  //cout<<"Edn(SURF)"<< Edn[nlayer] << "    Eup(SURF) "<< Eup[nlayer]<<endl;
+  cout<<"Edn(TOA) " << Edn[0] <<"    Eup(TOA) "<< Eup[0] <<endl;
+  cout<<"Edn(SURF)"<< Edn[nlayer] << "    Eup(SURF) "<< Eup[nlayer]<<endl;
   // cout<<nmu<<"  "<<Eup[nlayer]<<endl;
 
-
-	cout<<beta0<<"  "<< Edn[nlyer]<<endl;
 }
 
 double planck(double temp, double lambda_dn, double lambda_up ){
@@ -246,3 +211,4 @@ double planck(double temp, double lambda_dn, double lambda_up ){
  return M_PI* sum;
   
 }
+
