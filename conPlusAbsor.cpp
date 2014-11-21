@@ -78,7 +78,7 @@ gnuplot_ctrl *g1;
 
 int main(int argc, char** args){
 	
-	bool do_plots=false;
+	bool do_plots=true;
 
 
 	//if(do_plots==true){
@@ -117,8 +117,8 @@ int main(int argc, char** args){
 	else {
 		nLayer= atoi(args[1]);
 		nMu=atoi(args[2]);
-		nLayer=25;
-		cout<<"Setting number of layers to 25 for testing. To change it, one first hast interpolate for the optical thickness."<<endl;
+		nLayer=20;
+		cout<<"Setting number of layers to 20 for testing. To change it, one first hast interpolate for the optical thickness."<<endl;
 		}
 	
 
@@ -127,21 +127,16 @@ int main(int argc, char** args){
 
 	readAbsorptionFile("co2.dtau",waveNumVec,optThickMat);
 	//cout<<"optThickMatSize:  "<<optThickMat[2].size()<<endl;
-	getWaveLengthFromWaveNumVec(waveNumVec,waveLengthVec);
+	getWaveLengthFromWaveNumVec(waveNumVec,waveLengthVec); // wavelengthVec [0]= 2e-5; waveLengthVec[waveLengthVec.size()]=1.17647e-05
+
 
 	reverseOptThickMat(optThickMat);
 	createPressureVecB(nLayer,  PressureVecB);
 	
 	cout<<"				.....Done"<<endl;
 
-double sum=0;		
-	for(int j=0;j<optThickMat.size();j++){
-	for(int i=0;i<nLayer;i++){
-		sum+=optThickMat[j][i];
-	}
-	}
-	cout<<" total "<<sum<<endl;
-
+	//cout<< waveLengthVec[0] << "     "<< waveLengthVec[waveLengthVec.size()-1]<<endl;
+	//print_vec(optThickMat[1]);
 	PressureVecM.resize(nLayer);
 	mid_temp_vec.resize(nLayer);
 	opt_thick_vec.resize(nLayer);
@@ -154,13 +149,15 @@ double sum=0;
 	deltaPressure=pressure0/(nLayer); //(nLayer-1)
 	
 
-	createPressureVecM(nLayer,  PressureVecM);
-	
+	createPressureVecM(nLayer,PressureVecM);
+	/*
 	for(int i=0;i<PressureVecM.size();i++){
 		PressureVecM[i]=i*deltaPressure +deltaPressure/2.;
 	}
+*/
 
 
+	/*
 	vector<double> bands_vec;
 	bands_vec.resize(4); // Consider 3 bands: H2O absorption, atmospheric window, CO2 abs
 	// lower boarders in mu m  @ToDo: describe that planck functions convert mycro_meter in meter
@@ -169,62 +166,65 @@ double sum=0;
 	bands_vec[2]= 12;
 	bands_vec[3]= 101;
 	// optical thickness for each band
+	*/
 	
-		
 	vector <double> Edelt_vec_3Bands;
 	Edelt_vec_3Bands.resize(nLayer);
-		
+	
+
+
 
 		//mid_temp_vec.end()+=calcDeltaTempSolarSurfaceHeating(deltaTime,eSolarSurface,deltaPressure);
 	for(int timeStep=0;timeStep<=MaxTime;timeStep+=deltaTime){
 
-			
+			//for(int i=0;i<planckRadiation_vec.size();i++){
+			//	cout<<planckRadiation_vec[i]<<"      "<<mid_temp_vec[i]<<endl;
+
+			//}
 
 		fill(Edelt_vec_3Bands.begin(),Edelt_vec_3Bands.end(),0.);
-		for (int i=0;i<bands_vec.size()-1;i++){
+		for (int i=waveLengthVec.size()-1;i>=0;i--){
+			//cout << i << endl;
+			opt_thick_vec= optThickMat[i];
+			//print_vec(opt_thick_vec);
+			//cout<<"waveLengthVec "<< waveLengthVec[i]<<endl; // achtung!! planck funktion arbeitet eiegntlich mit mycron!!!!!
+			LSurface=planck(mid_temp_vec[nLayer-1],waveLengthVec[i],waveLengthVec[i])/M_PI;
 			
-
-			if (i==0) {
-				tau=10.;
-			}
-			if (i==1){
-				tau=1;
-			}
-			if (i==2) {
-				tau=4.;
-			}
-
-			//cout << i <<"  "<< beta0 << endl;
-			//cout << "band lower "<< bands_vec[i]<<" band upper" << bands_vec[i+1]-1<< endl;
-	
-			//calcOpticalThickfromPressure(beta0,deltaPressure,opt_thick_vec);
-			getOpticalThickfromPressure(  tau, nLayer, opt_thick_vec);
-			LSurface=planck(mid_temp_vec[nLayer-1],bands_vec[i],bands_vec[i+1]-1)/M_PI;
-			
-
 			//Still have to create the temp_vec. 
 			//Probably a loop over the  lambda seqments.
-			planckVec(mid_temp_vec, bands_vec[i] , bands_vec[i+1]-1,planckRadiation_vec);
-	
-			radiativeTransfer(nLayer, nMu, opt_thick_vec,LSurface,planckRadiation_vec, Edelt_vec);
+			planckVec(mid_temp_vec, waveLengthVec[i], waveLengthVec[i],planckRadiation_vec);
 			
+
+
+			//print_vec(planckRadiation_vec);
+			radiativeTransfer(nLayer, nMu, opt_thick_vec,LSurface,planckRadiation_vec, Edelt_vec);	
+			//print_vec(Edelt_vec);
 			for (int j=0; j<Edelt_vec.size();j++){
 				Edelt_vec_3Bands[j]+=Edelt_vec[j];
 			}
-			
 
 		}
+
+
+
+
+
+
 		Edelt_vec_3Bands[nLayer-1]= Edelt_vec_3Bands[nLayer-1]+eSolarSurface;
 
 			
 			//print_vec(Edelt_vec);
 
-		
+			
 
 			calcDeltaTempVec(deltaTime,Edelt_vec_3Bands,deltaPressure,middleDeltaTemp_vec);
-	
+			//print_vec(Edelt_vec_3Bands);
+			//print_vec(mid_temp_vec);
+
 			vectorAdd(middleDeltaTemp_vec,mid_temp_vec,mid_temp_vec);
 			
+
+
 			getPotTempVecFromTempVec(mid_temp_vec, PressureVecM,mid_pot_temp_vec);
 
 			sort(mid_pot_temp_vec.begin(), mid_pot_temp_vec.end(), greater<double>());
@@ -396,9 +396,10 @@ double planck(double temp, double lambda_dn, double lambda_up ){
   	double k_b=1.38065e-23;// J/K
   	double sum=0;
   	double lambda;
- 	for(int i=lambda_dn;i<=lambda_up;i++){
-   		lambda=i*1e-6;
+ 	for(double i=lambda_dn;i<=lambda_up;i++){
+   		lambda=i;//*1e-6;
     	sum+=2*hcc/pow(lambda,5)/(exp(hc/k_b/temp/lambda)-1)*1e-6;
+
 	}
  	return M_PI* sum; 
 }
