@@ -21,6 +21,9 @@ const double spezGasConstAir=287.; //in J/(kg*K)
 const double cpConst=1005;
 const double molarMassDryAir= 28.97; // g/mol
 const double z_scale=8000;
+const double c=2.99e8;         // [m s^-1]
+const double h=6.626e-34;      // [J s]
+const double k_B=1.3806e-23;    // [J K^-1]
 
 
 double calculatePotTemp(double temp, double pressure);
@@ -66,7 +69,7 @@ void vectorAdd(vector<T> inputVecA,vector<T> inputVecB, vector<T> & outputVec){
 
 int main(int argc, char** args){
 	
-	bool do_plots=true;
+	bool do_plots=false;
 
 
 	//if(do_plots==true){
@@ -76,7 +79,7 @@ int main(int argc, char** args){
 
 	int nLayer,nMu;
 
-	double deltaTime=600; //in s
+	double deltaTime=6000; //in s
 	double timeStep;
 	double MaxTime=3.15569e7; //3.15569e7=1a in seconds
 	double beta0=0.0019;
@@ -111,7 +114,7 @@ int main(int argc, char** args){
 	planckRadiation_vec.resize(nLayer);
 	mid_height_vec.resize(nLayer);
 
-	fill(mid_temp_vec.begin(),mid_temp_vec.end(),280.);
+	fill(mid_temp_vec.begin(),mid_temp_vec.end(),250.);
 	
 
 	deltaPressure=pressure0/(nLayer); //(nLayer-1)
@@ -125,17 +128,17 @@ int main(int argc, char** args){
 	vector<double> bands_vec;
 	bands_vec.resize(4); // Consider 3 bands: H2O absorption, atmospheric window, CO2 abs
 	// lower boarders in mu m  @ToDo: describe that planck functions convert mycro_meter in meter
-	bands_vec[0]= 4;
-	bands_vec[1]= 8;
-	bands_vec[2]= 12;
-	bands_vec[3]= 101;
+	bands_vec[0]= 4.0e-6;
+	bands_vec[1]= 8.0e-6;
+	bands_vec[2]= 12.0e-6;
+	bands_vec[3]= 101.0e-6;
 	// optical thickness for each band
 	
 		
 	vector <double> Edelt_vec_3Bands;
 	Edelt_vec_3Bands.resize(nLayer);
 		
-
+for (tau =0; tau <= 10; tau++){
 		//mid_temp_vec.end()+=calcDeltaTempSolarSurfaceHeating(deltaTime,eSolarSurface,deltaPressure);
 	for(int timeStep=0;timeStep<=MaxTime;timeStep+=deltaTime){
 
@@ -144,7 +147,7 @@ int main(int argc, char** args){
 		fill(Edelt_vec_3Bands.begin(),Edelt_vec_3Bands.end(),0.);
 		for (int i=0;i<bands_vec.size()-1;i++){
 			
-
+			/*
 			if (i==0) {
 				beta0= 0.0019;
 				tau=10.;
@@ -157,15 +160,18 @@ int main(int argc, char** args){
 				beta0= 6.8e-4;
 				tau=1.;
 			}
+			*/
 
 			//cout << i <<"  "<< beta0 << endl;
 			//cout << "band lower "<< bands_vec[i]<<" band upper" << bands_vec[i+1]-1<< endl;
 	
 			//calcOpticalThickfromPressure(beta0,deltaPressure,opt_thick_vec);
 			getOpticalThickfromPressure(  tau, nLayer, opt_thick_vec);
-			LSurface=planck(mid_temp_vec[nLayer-1],bands_vec[i],bands_vec[i+1]-1)/M_PI;
-			
 
+			LSurface=planck(mid_temp_vec[nLayer-1],bands_vec[i],bands_vec[i+1]);// /M_PI;
+			
+			// cout<<std::scientific;
+		//  cout<<"L surf  "<< LSurface<<endl;
 			//Still have to create the temp_vec. 
 			//Probably a loop over the  lambda seqments.
 			planckVec(mid_temp_vec, bands_vec[i] , bands_vec[i+1]-1,planckRadiation_vec);
@@ -253,6 +259,8 @@ int main(int argc, char** args){
 			
 	 
 		}
+		cout<<"tau " <<tau<<"        Bodentemp "<<mid_temp_vec[nLayer-1]<<endl;
+}
 gnuplot_close (g1) ; 
 	//print_vec(mid_pot_temp_vec);
 	//print_vec(mid_temp_vec);
@@ -335,14 +343,16 @@ void radiativeTransfer(int nlayer,int nmu, vector<double> opt_thick_vec,double L
   Enet.resize(nlayer+1);
   Edelta.resize(nlayer);
   
-	
-
+	fill(Edn.begin(),Edn.end(),0);
+	fill(Eup.begin(),Eup.end(),0);
+/*
   if(Edn.size()!=nlayer+1){
 	  Edn.resize(nlayer+1);
 	  Eup.resize(nlayer+1);
 	  fill(Edn.begin(),Edn.end(),0);
 	  fill(Eup.begin(),Eup.end(),0);
 	}
+*/
  
  
     for(double mu=1./nmu/2;mu<=1;mu+=1./nmu){
@@ -354,11 +364,13 @@ void radiativeTransfer(int nlayer,int nmu, vector<double> opt_thick_vec,double L
 		}
 		fill(L.begin(),L.end(),sqrt(-1));
 		L[nlayer]= LSurface;//planck(288.15,lambda_dn,lambda_up)/M_PI;        //sigma*pow(288.15,4)/M_PI;
-	    
+	     //cout<<std::scientific;
+		  //cout<<"Lsuf  "<< L[nlayer]<<endl;
 		Eup[nlayer]=Eup[nlayer]+L[nlayer]*2*M_PI*mu*1./nmu;
 	  	
 		for(int i=nlayer;i>0;i--){
 		  L[i-1]=L[i]*exp(-opt_thick_vec[i-1]/mu)+sb_vec[i-1]*(1-exp(-opt_thick_vec[i-1]/mu));
+		 
 		  Eup[i-1]=Eup[i-1]+L[i-1]*2*M_PI*mu*1./nmu;
 		}
     
@@ -390,18 +402,39 @@ void radiativeTransfer(int nlayer,int nmu, vector<double> opt_thick_vec,double L
 	
 
 }
-
+/*
 double planck(double temp, double lambda_dn, double lambda_up ){
 	double hcc=5.955214e-17;//Wm*2
  	double hc=1.986446e-25;//Jm
   	double k_b=1.38065e-23;// J/K
   	double sum=0;
   	double lambda;
- 	for(int i=lambda_dn;i<=lambda_up;i++){
+ 	for(double i=lambda_dn+0.125;i<=lambda_up;i+=0.25){
    		lambda=i*1e-6;
-    	sum+=2*hcc/pow(lambda,5)/(exp(hc/k_b/temp/lambda)-1)*1e-6;
-	}
- 	return M_PI* sum; 
+    	sum+=2*hcc/pow(lambda,5)/(exp(hc/k_b/temp/lambda)-1)*0.25e-6; // TODO: dlambda einführen!
+    		}
+ 	return M_PI*sum; 
+}
+
+*/
+
+
+
+double planck(double temp, double lambda_dn, double lambda_up ){
+	double hcc=5.955214e-17;//Wm*2
+ 	double hc=1.986446e-25;//Jm
+  	double k_b=1.38065e-23;// J/K
+  	double sum=0;
+  	double deltaLambda;
+  	double nLambda=100;
+
+  	deltaLambda= (lambda_up-lambda_dn)/nLambda;
+
+ 	for(double i=lambda_dn+deltaLambda/2;i<lambda_up;i+=deltaLambda){
+   		//lambda=i*1e-6;
+    	sum+=2*h*c*c/pow(i,5)/(exp(h*c/k_b/temp/i)-1.)*deltaLambda; // TODO: dlambda einführen!
+    		}
+ 	return sum; 
 }
 
 void planckVec(vector<double> tempVec, double lambda_dn, double lambda_up, vector <double> & bbVec){
